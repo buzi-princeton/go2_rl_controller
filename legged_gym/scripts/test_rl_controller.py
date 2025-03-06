@@ -11,6 +11,7 @@ from legged_gym.utils import  get_args, export_policy_as_jit, task_registry, Log
 import numpy as np
 import torch
 
+from rl_controller.rl_controller import *
 
 def play(args):
     env_cfg, train_cfg = task_registry.get_cfgs(name=args.task)
@@ -39,12 +40,14 @@ def play(args):
         path = os.path.join(LEGGED_GYM_ROOT_DIR, 'logs', train_cfg.runner.experiment_name, 'exported', 'policies')
         export_policy_as_jit(ppo_runner.alg.actor_critic, path)
         print('Exported policy as jit script to: ', path)
+    
+    controller = Go2RLController(device="cuda:0")
 
     for i in range(10*int(env.max_episode_length)):
-        actions = policy(obs.detach())
-        obs, _, rews, dones, infos = env.step(actions.detach())
-        # print(obs[0][:2])
-        print(obs[0][9:12]) # commands
+        # actions = policy(obs.detach())
+        # actions = torch.tensor(controller.get_action(state=obs[0, :36], action=obs[0, 36:]), device=controller.device).reshape((1, 12))
+        actions = controller.policy(obs.detach())
+        obs, _, rews, dones, infos = env.step(torch.tensor(actions, device=controller.device))
 
 if __name__ == '__main__':
     EXPORT_POLICY = True

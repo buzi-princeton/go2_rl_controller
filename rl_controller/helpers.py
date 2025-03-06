@@ -1,4 +1,70 @@
-from .base_config import BaseConfig
+import os
+import inspect
+
+def class_to_dict(obj) -> dict:
+    if not  hasattr(obj,"__dict__"):
+        return obj
+    result = {}
+    for key in dir(obj):
+        if key.startswith("_"):
+            continue
+        element = []
+        val = getattr(obj, key)
+        if isinstance(val, list):
+            for item in val:
+                element.append(class_to_dict(item))
+        else:
+            element = class_to_dict(val)
+        result[key] = element
+    return result
+
+def get_load_path(root, load_run=-1, checkpoint=-1):
+    try:
+        runs = os.listdir(root)
+        #TODO sort by date to handle change of month
+        runs.sort()
+        if 'exported' in runs: runs.remove('exported')
+        last_run = os.path.join(root, runs[-1])
+    except:
+        raise ValueError("No runs in this directory: " + root)
+    if load_run==-1:
+        load_run = last_run
+    else:
+        load_run = os.path.join(root, load_run)
+
+    if checkpoint==-1:
+        models = [file for file in os.listdir(load_run) if 'model' in file]
+        models.sort(key=lambda m: '{0:0>15}'.format(m))
+        model = models[-1]
+    else:
+        model = "model_{}.pt".format(checkpoint) 
+
+    load_path = os.path.join(load_run, model)
+    return load_path
+
+class BaseConfig:
+    def __init__(self) -> None:
+        """ Initializes all member classes recursively. Ignores all namse starting with '__' (buit-in methods)."""
+        self.init_member_classes(self)
+    
+    @staticmethod
+    def init_member_classes(obj):
+        # iterate over all attributes names
+        for key in dir(obj):
+            # disregard builtin attributes
+            # if key.startswith("__"):
+            if key=="__class__":
+                continue
+            # get the corresponding attribute object
+            var =  getattr(obj, key)
+            # check if it the attribute is a class
+            if inspect.isclass(var):
+                # instantate the class
+                i_var = var()
+                # set the attribute to the instance instead of the type
+                setattr(obj, key, i_var)
+                # recursively init members of the attribute
+                BaseConfig.init_member_classes(i_var)
 
 class LeggedRobotCfg(BaseConfig):
     class env:
@@ -43,8 +109,8 @@ class LeggedRobotCfg(BaseConfig):
         resampling_time = 10. # time before command are changed[s]
         heading_command = True # if true: compute ang vel command from heading error
         class ranges:
-            lin_vel_x = [-0.5, 0.5] # min max [m/s]
-            lin_vel_y = [-0.5, 0.5]   # min max [m/s]
+            lin_vel_x = [-1.0, 1.0] # min max [m/s]
+            lin_vel_y = [-1.0, 1.0]   # min max [m/s]
             ang_vel_yaw = [-1, 1]    # min max [rad/s]
             heading = [-3.14, 3.14]
 
@@ -86,7 +152,7 @@ class LeggedRobotCfg(BaseConfig):
         linear_damping = 0.
         max_angular_velocity = 1000.
         max_linear_velocity = 1000.
-        armature = 0.001
+        armature = 0.
         thickness = 0.01
 
     class domain_rand:
@@ -103,14 +169,14 @@ class LeggedRobotCfg(BaseConfig):
             termination = -0.0
             tracking_lin_vel = 1.0
             tracking_ang_vel = 0.5
-            lin_vel_z = -1.0
+            lin_vel_z = -2.0
             ang_vel_xy = -0.05
             orientation = -0.
             torques = -0.00001
             dof_vel = -0.
             dof_acc = -2.5e-7
-            base_height = -2.0
-            feet_air_time =  2.0
+            base_height = -0. 
+            feet_air_time =  1.0
             collision = -1.
             feet_stumble = -0.0 
             action_rate = -0.01
@@ -138,12 +204,12 @@ class LeggedRobotCfg(BaseConfig):
         add_noise = True
         noise_level = 1.0 # scales other values
         class noise_scales:
-            dof_pos = 0.02
-            dof_vel = 2.0
-            lin_vel = 0.2
-            ang_vel = 0.3
-            gravity = 0.1
-            height_measurements = 0.2
+            dof_pos = 0.01
+            dof_vel = 1.5
+            lin_vel = 0.1
+            ang_vel = 0.2
+            gravity = 0.05
+            height_measurements = 0.1
 
     # viewer camera:
     class viewer:
@@ -160,8 +226,8 @@ class LeggedRobotCfg(BaseConfig):
         class physx:
             num_threads = 10
             solver_type = 1  # 0: pgs, 1: tgs
-            num_position_iterations = 20
-            num_velocity_iterations = 5
+            num_position_iterations = 4
+            num_velocity_iterations = 0
             contact_offset = 0.01  # [m]
             rest_offset = 0.0   # [m]
             bounce_threshold_velocity = 0.5 #0.5 [m/s]
@@ -177,7 +243,7 @@ class LeggedRobotCfgPPO(BaseConfig):
         init_noise_std = 1.0
         actor_hidden_dims = [512, 256, 128]
         critic_hidden_dims = [512, 256, 128]
-        activation = 'tanh' # can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
+        activation = 'elu' # can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         # only for 'ActorCriticRecurrent':
         # rnn_type = 'lstm'
         # rnn_hidden_size = 512
@@ -213,3 +279,55 @@ class LeggedRobotCfgPPO(BaseConfig):
         load_run = -1 # -1 = last run
         checkpoint = -1 # -1 = last saved model
         resume_path = None # updated from load_run and chkpt
+
+class GO2RoughCfg( LeggedRobotCfg ):
+    class init_state( LeggedRobotCfg.init_state ):
+        pos = [0.0, 0.0, 0.42] # x,y,z [m]
+        default_joint_angles = { # = target angles [rad] when action = 0.0
+            'FL_hip_joint': 0.1,   # [rad]
+            'RL_hip_joint': 0.1,   # [rad]
+            'FR_hip_joint': -0.1 ,  # [rad]
+            'RR_hip_joint': -0.1,   # [rad]
+
+            'FL_thigh_joint': 0.8,     # [rad]
+            'RL_thigh_joint': 1.,   # [rad]
+            'FR_thigh_joint': 0.8,     # [rad]
+            'RR_thigh_joint': 1.,   # [rad]
+
+            'FL_calf_joint': -1.5,   # [rad]
+            'RL_calf_joint': -1.5,    # [rad]
+            'FR_calf_joint': -1.5,  # [rad]
+            'RR_calf_joint': -1.5,    # [rad]
+        }
+
+    class control( LeggedRobotCfg.control ):
+        # PD Drive parameters:
+        control_type = 'P'
+        stiffness = {'joint': 20.}  # [N*m/rad]
+        damping = {'joint': 0.5}     # [N*m*s/rad]
+        # action scale: target angle = actionScale * action + defaultAngle
+        action_scale = 0.25
+        # decimation: Number of control action updates @ sim DT per policy DT
+        decimation = 4
+
+    class asset( LeggedRobotCfg.asset ):
+        file = '{LEGGED_GYM_ROOT_DIR}/resources/robots/go2/urdf/go2.urdf'
+        name = "go2"
+        foot_name = "foot"
+        penalize_contacts_on = ["thigh", "calf"]
+        terminate_after_contacts_on = ["base"]
+        self_collisions = 1 # 1 to disable, 0 to enable...bitwise filter
+  
+    class rewards( LeggedRobotCfg.rewards ):
+        soft_dof_pos_limit = 0.9
+        base_height_target = 0.25
+        class scales( LeggedRobotCfg.rewards.scales ):
+            torques = -0.0002
+            dof_pos_limits = -10.0
+
+class GO2RoughCfgPPO( LeggedRobotCfgPPO ):
+    class algorithm( LeggedRobotCfgPPO.algorithm ):
+        entropy_coef = 0.01
+    class runner( LeggedRobotCfgPPO.runner ):
+        run_name = ''
+        experiment_name = 'rough_go2'

@@ -19,6 +19,23 @@ class GO2RoughCfg( LeggedRobotCfg ):
             'FR_calf_joint': -1.5,  # [rad]
             'RR_calf_joint': -1.5,    # [rad]
         }
+        # pos = [0.0, 0.0, 0.28] # x,y,z [m]
+        # default_joint_angles = { # = target angles [rad] when action = 0.0
+        #     'FL_hip_joint': 0.1,   # [rad]
+        #     'RL_hip_joint': 0.1,   # [rad]
+        #     'FR_hip_joint': -0.1 ,  # [rad]
+        #     'RR_hip_joint': -0.1,   # [rad]
+
+        #     'FL_thigh_joint': 0.9,     # [rad]
+        #     'RL_thigh_joint': 0.9,   # [rad]
+        #     'FR_thigh_joint': 0.9,     # [rad]
+        #     'RR_thigh_joint': 0.9,   # [rad]
+
+        #     'FL_calf_joint': -1.9,   # [rad]
+        #     'RL_calf_joint': -1.9,    # [rad]
+        #     'FR_calf_joint': -1.9,  # [rad]
+        #     'RR_calf_joint': -1.9,    # [rad]
+        # }
 
     class control( LeggedRobotCfg.control ):
         # PD Drive parameters:
@@ -40,7 +57,7 @@ class GO2RoughCfg( LeggedRobotCfg ):
   
     class rewards( LeggedRobotCfg.rewards ):
         soft_dof_pos_limit = 0.9
-        base_height_target = 0.25
+        base_height_target = 0.35
         class scales( LeggedRobotCfg.rewards.scales ):
             torques = -0.0002
             dof_pos_limits = -10.0
